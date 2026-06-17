@@ -1,0 +1,14 @@
+{
+  "name": "keep-fit-generator",
+  "version": "1.0.0",
+  "description": "Draw running routes on map and generate Garmin FIT files for Keep app",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@garmin/fitsdk": "*",
+    "express": "^4.18.2"
+  }
+}

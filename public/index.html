@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Keep-FIT-Generator v1.0.0</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- ====== Sidebar ====== -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+
+        <!-- Header -->
+        <h1>🏃 Keep-FIT-Generator <span class="version">v1.0.0</span></h1>
+
+        <!-- Map Controls -->
+        <div class="map-controls">
+          <button class="btn btn-sm btn-accent" id="locateBtn">📍 定位</button>
+          <button class="btn btn-sm btn-draw-toggle" id="drawToggleBtn">✏️ 开始绘制</button>
+          <button class="btn btn-sm btn-secondary" id="clearBtn">🗑️ 清除</button>
+        </div>
+        <div class="draw-hint" id="drawHint">浏览模式 · 可自由拖拽地图</div>
+
+        <!-- Route Info -->
+        <div class="info-card" id="routeInfo">
+          <div class="info-row"><span>闭合周长</span><span id="baseDistance">0.00 km</span></div>
+          <div class="info-row"><span>采样点</span><span id="sampleCount">0</span></div>
+          <div class="info-row"><span>预估总距</span><span class="highlight" id="totalDistance">0.00 km</span></div>
+        </div>
+
+        <!-- ====== 运动参数 ====== -->
+        <div class="section">
+          <h2>📋 运动参数</h2>
+          <div class="row-3">
+            <div class="fg">
+              <label>静息心率</label>
+              <div class="range-2">
+                <input type="number" id="hrRest" value="60" min="30" max="120" placeholder="静息" />
+              </div>
+            </div>
+            <div class="fg">
+              <label>最大心率</label>
+              <div class="range-2">
+                <input type="number" id="hrMax" value="180" min="100" max="220" placeholder="最大" />
+              </div>
+            </div>
+            <div class="fg">
+              <label>体重 kg</label>
+              <input type="number" id="weight" value="65" min="30" max="150" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== 路线参数 ====== -->
+        <div class="section">
+          <h2>🗺️ 路线参数</h2>
+          <div class="row-3">
+            <div class="fg">
+              <label>圈数</label>
+              <input type="number" id="lapCount" value="1" min="1" max="20" />
+            </div>
+            <div class="fg">
+              <label>采样密度</label>
+              <input type="number" id="sampleDensity" value="15" min="5" max="100" />
+            </div>
+            <div class="fg">
+              <label>最大偏移 m</label>
+              <input type="number" id="maxSigma" value="2" min="0" max="200" step="0.1" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== 地形参数 ====== -->
+        <div class="section">
+          <h2>🏔️ 地形</h2>
+          <div class="row-2">
+            <div class="fg">
+              <label>基础海拔 m</label>
+              <input type="number" id="baseAltitude" value="50" min="0" max="5000" />
+            </div>
+            <div class="fg">
+              <label>海拔变化 ±m</label>
+              <input type="number" id="altitudeVariation" value="15" min="0" max="500" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== 配速设置 ====== -->
+        <div class="section">
+          <h2>⏱️ 配速范围</h2>
+          <div class="range-row">
+            <div class="fg">
+              <label>最快</label>
+              <div class="pace-inputs">
+                <input type="number" id="paceMinMin" value="4" min="2" max="15" placeholder="分" />
+                <span>:</span>
+                <input type="number" id="paceMinSec" value="30" min="0" max="59" placeholder="秒" />
+              </div>
+            </div>
+            <span class="range-sep">~</span>
+            <div class="fg">
+              <label>最慢</label>
+              <div class="pace-inputs">
+                <input type="number" id="paceMaxMin" value="7" min="2" max="15" placeholder="分" />
+                <span>:</span>
+                <input type="number" id="paceMaxSec" value="0" min="0" max="59" placeholder="秒" />
+              </div>
+            </div>
+          </div>
+          <div class="unit-hint">每份导出在最快~最慢之间随机取配速</div>
+        </div>
+
+        <!-- ====== 时间设置 ====== -->
+        <div class="section">
+          <h2>🕐 时间范围</h2>
+          <div class="range-row">
+            <div class="fg">
+              <label>最早</label>
+              <div class="pace-inputs">
+                <input type="number" id="timeMinH" value="6" min="0" max="23" placeholder="时" />
+                <span>:</span>
+                <input type="number" id="timeMinM" value="0" min="0" max="59" placeholder="分" />
+              </div>
+            </div>
+            <span class="range-sep">~</span>
+            <div class="fg">
+              <label>最晚</label>
+              <div class="pace-inputs">
+                <input type="number" id="timeMaxH" value="9" min="0" max="23" placeholder="时" />
+                <span>:</span>
+                <input type="number" id="timeMaxM" value="0" min="0" max="59" placeholder="分" />
+              </div>
+            </div>
+          </div>
+          <div class="unit-hint">每份导出在最早~最晚之间随机取时间</div>
+        </div>
+
+        <!-- ====== 导出设置 ====== -->
+        <div class="section">
+          <h2>📤 批量导出</h2>
+          <div class="row-2">
+            <div class="fg">
+              <label>导出份数</label>
+              <input type="number" id="exportCount" value="1" min="1" max="20" />
+            </div>
+            <div class="fg">
+              <label>&nbsp;</label>
+              <button class="btn btn-sm btn-accent" id="consecutiveBtn">
+                🔗 连续日期: 关
+              </button>
+            </div>
+          </div>
+          <div id="exportList"></div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="btn-group">
+          <button class="btn btn-info" id="previewBtn">📊 预览曲线</button>
+          <button class="btn btn-primary" id="generateBtn">📦 批量生成 FIT</button>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <!-- Charts -->
+        <div class="charts-section" id="chartsSection" style="display:none">
+          <div class="chart-container"><h3>配速 (min/km)</h3><canvas id="paceChart"></canvas></div>
+          <div class="chart-container"><h3>心率 (bpm)</h3><canvas id="hrChart"></canvas></div>
+          <div class="chart-container"><h3>海拔 (m)</h3><canvas id="altChart"></canvas></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ====== Map ====== -->
+    <div id="map"></div>
+    <div class="mode-indicator" id="modeIndicator">
+      🗺️ <strong>浏览模式</strong> · 点击「开始绘制」进入绘制模式
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html>
