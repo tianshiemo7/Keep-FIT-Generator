@@ -2,27 +2,51 @@
 setlocal
 cd /d "%~dp0"
 
-set "NODE_DIR=%~dp0..\Fit+Tool+v1.2(1)\Fit Tool v1.2\node-v24.12.0-win-x64"
-if not exist "%NODE_DIR%\node.exe" (
-  echo Node.js not found at "%NODE_DIR%"
-  echo Please ensure Fit Tool v1.2 is installed.
-  pause
-  exit /b 1
+:: ====== Find Node.js ======
+set "NODE_EXE="
+
+:: 1. Try PATH first
+where node >nul 2>&1
+if %errorlevel% equ 0 (
+  for /f "delims=" %%i in ('where node') do set "NODE_EXE=%%i"
+  goto :found
 )
 
-echo Using bundled Node from "%NODE_DIR%"...
-set "PATH=%NODE_DIR%;%PATH%"
+:: 2. Common install locations
+for %%d in (
+  "%ProgramFiles%\nodejs"
+  "%ProgramFiles(x86)%\nodejs"
+  "%LocalAppData%\Programs\Microsoft VS Code\resources\app\extensions\ms-vscode.js-debug\src\bootloader.bundle.js"
+) do (
+  if exist "%%d\node.exe" set "NODE_EXE=%%d\node.exe" && goto :found
+)
 
-if not exist node_modules (
+:: 3. Not found
+echo ============================================
+echo   Node.js 未找到！
+echo   请从 https://nodejs.org 下载安装 Node.js ^(≥18^)
+echo   安装时勾选 "Add to PATH"
+echo ============================================
+pause
+exit /b 1
+
+:found
+echo Node.js: "%NODE_EXE%"
+for /f "tokens=*" %%v in ('"%NODE_EXE%" -v 2^>^&1') do echo Version: %%v
+
+:: ====== Install dependencies ======
+if not exist node_modules\ (
+  echo.
   echo Installing dependencies...
-  call npm install
+  call "%NODE_EXE%" npm install
   if errorlevel 1 (
-    echo npm install failed.
+    echo npm install 失败，请检查网络连接后重试
     pause
     exit /b 1
   )
 )
 
+:: ====== Start ======
 echo.
 echo ============================================
 echo   Keep-FIT-Generator v1.0.0
@@ -31,6 +55,6 @@ echo ============================================
 echo.
 echo Starting server on http://localhost:3000 ...
 start http://localhost:3000
-npm start
+"%NODE_EXE%" server.js
 
 endlocal

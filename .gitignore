@@ -1,2 +1,23 @@
+# Dependencies
 node_modules/
+
+# Claude
 .claude/
+
+# Environment (contains secrets / local overrides)
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Package lock (keep in repo to pin deps; uncomment if you prefer not to track it)
+# package-lock.json

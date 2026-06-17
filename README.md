@@ -14,13 +14,16 @@
 
 ### 环境要求
 
-- Node.js ≥ 18（或使用自带的 `run.cmd`）
+- Node.js ≥ 18
 
 ### 安装运行
 
 ```bash
-# 克隆仓库
+# 克隆仓库（GitHub / Gitee 任选其一）
 git clone https://github.com/tianshiemo7/Keep-FIT-Generator.git
+# 或
+git clone https://gitee.com/tesm1234/Keep-FIT-Generator.git
+
 cd Keep-FIT-Generator
 
 # 安装依赖
@@ -30,9 +33,13 @@ npm install
 npm start
 ```
 
-浏览器自动打开 `http://localhost:3000`，或手动访问。
+浏览器访问 `http://localhost:3000`。
 
-> **Windows 用户**：直接双击 `run.cmd` 即可自动安装依赖并启动。
+> **一键启动**：
+> - **Windows**：双击 `run.cmd`
+> - **Linux / macOS**：`bash run.sh`
+>
+> 脚本会自动检测 Node.js 环境并安装依赖。
 
 ## 📖 使用指南
 
@@ -86,10 +93,12 @@ npm start
 Keep-FIT-Generator/
 ├── server.js          # 后端：FIT 编码 + API
 ├── run.cmd            # Windows 一键启动
-├── package.json
+├── run.sh             # Linux/macOS 一键启动
+├── package.json       # 依赖声明 (Node ≥18, ESM)
+├── .env.example       # 环境变量示例
 └── public/
-    ├── index.html     # 前端页面
-    ├── main.js        # 前端逻辑
+    ├── index.html     # 前端页面（Leaflet + Chart.js + JSZip）
+    ├── main.js        # 前端逻辑（高德瓦片、GCJ-02↔WGS-84）
     └── style.css      # 暗色主题
 ```
 
