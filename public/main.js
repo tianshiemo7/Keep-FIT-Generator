@@ -472,7 +472,7 @@ function fmtTime(h, m) { return String(h).padStart(2,"0")+":"+String(m).padStart
 
 // ====== Build Export List ======
 function rebuildExports() {
-  const count = Math.max(1, Math.min(20, parseInt(document.getElementById("exportCount")?.value, 10) || 1));
+  const count = Math.max(1, Math.min(100, parseInt(document.getElementById("exportCount")?.value, 10) || 1));
   const maxSigma = parseFloat(document.getElementById("maxSigma")?.value) || 2;
   const now = new Date();
   $exportList.innerHTML = "";
