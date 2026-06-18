@@ -73,6 +73,9 @@ let basePolyline = null, samplePolyline = null;
 let isDrawing = false, drawMode = false;
 let generatedSamples = null;
 let consecutiveDays = false;
+let useDistanceRange = false;  // distance range mode active
+let fixStartPoint = false;     // fix starting point
+let startPointMarker = null;   // map marker for fixed start point
 let paceChart = null, hrChart = null, altChart = null;
 let previewCursor = null; // GCJ-02 dot during drawing
 
@@ -88,6 +91,11 @@ const $charts = document.getElementById("chartsSection");
 const $exportList = document.getElementById("exportList");
 const $map = document.getElementById("map");
 const $consBtn = document.getElementById("consecutiveBtn");
+const $modeLapBtn = document.getElementById("modeLapBtn");
+const $modeDistBtn = document.getElementById("modeDistBtn");
+const $lapModeInputs = document.getElementById("lapModeInputs");
+const $distModeInputs = document.getElementById("distModeInputs");
+const $fixStartPt = document.getElementById("fixStartPoint");
 
 // ====== Locate (IP 定位优先 + GPS 高精度增强) ======
 let locationMarker = null;
@@ -214,6 +222,7 @@ function onDrawFinish() {
   if (previewCursor) { map.removeLayer(previewCursor); previewCursor = null; }
   if (routePoints.length < 3) { updateMsg("路线太短，至少3个点", "error"); routePoints = []; drawBaseLine(); refreshUI(); return; }
   autoClosePath(); drawBaseLine(); generateSamples();
+  updateStartMarker();
   updateMsg(`✅ 闭合路线 · ${generatedSamples ? generatedSamples.length : 0} 采样点`, "success");
 }
 
@@ -281,7 +290,7 @@ function perturb(pt, sigma) {
 function generateSamples() {
   const sigma = parseFloat(document.getElementById("maxSigma")?.value) || 2;
   const density = parseInt(document.getElementById("sampleDensity")?.value, 10) || 15;
-  const laps = Math.max(1, parseInt(document.getElementById("lapCount")?.value, 10) || 1);
+  const laps = getEffectiveLaps();
   const perimeter = totalDist(routePoints);
   const nPerLap = Math.max(routePoints.length, Math.round((perimeter/1000)*density));
   const smooth = smoothCurve(routePoints, nPerLap);
@@ -295,18 +304,31 @@ function generateSamples() {
 }
 
 // ====== Random-start variant ======
-function generateVariant(seed, sigma) {
+function generateVariant(seed, sigma, laps) {
   const density = parseInt(document.getElementById("sampleDensity")?.value, 10) || 15;
-  const laps = Math.max(1, parseInt(document.getElementById("lapCount")?.value, 10) || 1);
+  const effectiveLaps = laps ?? getEffectiveLaps();
   const perimeter = totalDist(routePoints);
   const nPerLap = Math.max(routePoints.length, Math.round((perimeter/1000)*density));
   const smooth = smoothCurve(routePoints, nPerLap);
   // Seeded RNG
   let s = seed; const sr = () => { s = (s*16807+0)%2147483647; return s/2147483647; };
-  const startIdx = Math.floor(sr() * smooth.length);
+  // Fixed or random starting point
+  let startIdx;
+  if (fixStartPoint) {
+    // Find smooth point closest to the user's first tap (routePoints[0])
+    const p0 = routePoints[0];
+    let minD = Infinity, bestI = 0;
+    for (let i = 0; i < smooth.length; i++) {
+      const d = (smooth[i].lat - p0.lat)**2 + (smooth[i].lng - p0.lng)**2;
+      if (d < minD) { minD = d; bestI = i; }
+    }
+    startIdx = bestI;
+  } else {
+    startIdx = Math.floor(sr() * smooth.length);
+  }
   const rotated = smooth.slice(startIdx).concat(smooth.slice(0, startIdx));
   const all = [];
-  for (let lap = 0; lap < laps; lap++) {
+  for (let lap = 0; lap < effectiveLaps; lap++) {
     for (const pt of rotated) {
       const g = () => { let u=0,v=0; while(u===0)u=sr(); while(v===0)v=sr(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*PI*v); };
       const mlat = 111320, mlng = 111320*Math.cos(pt.lat*PI/180);
@@ -320,19 +342,121 @@ function generateVariant(seed, sigma) {
 function randBetween(min, max) { return min + Math.random()*(max-min); }
 function randInt(min, max) { return Math.floor(randBetween(min, max+1)); }
 
+/**
+ * Returns the effective lap count based on the current mode.
+ * - Lap mode: reads lapCount input directly
+ * - Distance range mode: computes from a random or midpoint distance
+ * @param {number} [targetDistanceKm] - optional specific target (used per-export)
+ */
+function getEffectiveLaps(targetDistanceKm) {
+  const perimeter = totalDist(routePoints);
+  if (perimeter === 0) return 1;
+  if (!useDistanceRange) {
+    return Math.max(1, parseInt(document.getElementById("lapCount")?.value, 10) || 1);
+  }
+  const minKm = parseFloat(document.getElementById("distRangeMin")?.value) || 5;
+  const maxKm = parseFloat(document.getElementById("distRangeMax")?.value) || 8;
+  const targetKm = targetDistanceKm ?? ((minKm + maxKm) / 2);
+  const effectiveMax = Math.max(minKm, maxKm);
+  const clampedTarget = Math.max(minKm, Math.min(effectiveMax, targetKm));
+  return Math.max(1, Math.round(clampedTarget / (perimeter / 1000)));
+}
+
 // ====== Refresh basic UI ======
 function refreshUI() {
   const d = totalDist(routePoints);
-  const laps = Math.max(1, parseInt(document.getElementById("lapCount")?.value, 10) || 1);
+  const laps = getEffectiveLaps();
   $baseDist.textContent = (d/1000).toFixed(2)+" km";
   $totalDist.textContent = ((d*laps)/1000).toFixed(2)+" km";
   $sampleCount.textContent = generatedSamples ? generatedSamples.length : 0;
 }
-["lapCount","sampleDensity","maxSigma"].forEach(id => {
+// lapCount only triggers when NOT in distance range mode
+document.getElementById("lapCount")?.addEventListener("input", () => {
+  if (useDistanceRange) return;
+  if (routePoints.length >= 3) generateSamples();
+  refreshUI();
+});
+
+// sampleDensity and maxSigma always work
+["sampleDensity","maxSigma"].forEach(id => {
   document.getElementById(id)?.addEventListener("input", () => {
     if (routePoints.length >= 3) generateSamples();
     refreshUI();
   });
+});
+
+// ====== Distance Range Mode Toggle ======
+$modeLapBtn.addEventListener("click", () => {
+  useDistanceRange = false;
+  $modeLapBtn.classList.add("active");
+  $modeDistBtn.classList.remove("active");
+  $lapModeInputs.style.display = "";
+  $distModeInputs.style.display = "none";
+  document.getElementById("sampleDensity").value = document.getElementById("sampleDensity2").value;
+  document.getElementById("maxSigma").value = document.getElementById("maxSigma2").value;
+  if (routePoints.length >= 3) generateSamples();
+  rebuildExports();
+  refreshUI();
+});
+
+$modeDistBtn.addEventListener("click", () => {
+  useDistanceRange = true;
+  $modeDistBtn.classList.add("active");
+  $modeLapBtn.classList.remove("active");
+  $distModeInputs.style.display = "";
+  $lapModeInputs.style.display = "none";
+  document.getElementById("sampleDensity2").value = document.getElementById("sampleDensity").value;
+  document.getElementById("maxSigma2").value = document.getElementById("maxSigma").value;
+  if (routePoints.length >= 3) generateSamples();
+  rebuildExports();
+  refreshUI();
+});
+
+// Sync duplicate inputs bidirectionally
+["sampleDensity","maxSigma"].forEach(baseId => {
+  const el1 = document.getElementById(baseId);
+  const el2 = document.getElementById(baseId + "2");
+  if (el1 && el2) {
+    el1.addEventListener("input", () => { el2.value = el1.value; });
+    el2.addEventListener("input", () => { el1.value = el2.value; });
+  }
+});
+
+// Distance range inputs → regenerate
+["distRangeMin","distRangeMax"].forEach(id => {
+  document.getElementById(id)?.addEventListener("input", () => {
+    if (useDistanceRange && routePoints.length >= 3) {
+      generateSamples();
+      rebuildExports();
+    }
+    refreshUI();
+  });
+});
+
+// Fix starting point toggle
+function updateStartMarker() {
+  if (fixStartPoint && routePoints.length > 0) {
+    const p0 = routePoints[0];
+    if (startPointMarker) {
+      startPointMarker.setLatLng([p0.lat, p0.lng]);
+    } else {
+      startPointMarker = L.marker([p0.lat, p0.lng], {
+        icon: L.divIcon({
+          className: "start-marker",
+          html: '<div style="width:14px;height:14px;background:#3fb950;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(63,185,80,.6);"></div>',
+          iconSize: [14, 14], iconAnchor: [7, 7],
+        })
+      }).bindTooltip("📍 固定起点", { direction: "top", offset: [0, -10] }).addTo(map);
+    }
+  } else {
+    if (startPointMarker) { map.removeLayer(startPointMarker); startPointMarker = null; }
+  }
+}
+
+$fixStartPt.addEventListener("change", () => {
+  fixStartPoint = $fixStartPt.checked;
+  updateStartMarker();
+  updateMsg(fixStartPoint ? "📍 已固定起点，各导出起点一致" : "🔄 起点将随机旋转", "info");
 });
 
 // ====== Consecutive Days Toggle ======
@@ -363,6 +487,10 @@ function rebuildExports() {
   const tMaxH = parseInt(document.getElementById("timeMaxH")?.value,10)||9;
   const tMaxM = parseInt(document.getElementById("timeMaxM")?.value,10)||0;
 
+  // Distance range mode: pre-compute per-export random distances
+  const distMin = parseFloat(document.getElementById("distRangeMin")?.value) || 5;
+  const distMax = parseFloat(document.getElementById("distRangeMax")?.value) || 8;
+
   for (let i = 0; i < count; i++) {
     const d = new Date(now.getTime() + i*86400000);
     const sigma = (maxSigma * ratios[i%ratios.length]).toFixed(1);
@@ -370,9 +498,22 @@ function rebuildExports() {
     const paceSec = Math.round(randBetween(pMin, pMax));
     const pm = Math.floor(paceSec/60), ps = paceSec%60;
 
+    // Per-export laps & distance for distance range mode
+    let perExportLaps = 1, perExportDistKm = 0;
+    if (useDistanceRange) {
+      const randomTargetKm = randBetween(distMin, distMax);
+      perExportLaps = getEffectiveLaps(randomTargetKm);
+      const perimeter = totalDist(routePoints);
+      perExportDistKm = (perimeter * perExportLaps) / 1000;
+    }
+
     const div = document.createElement("div");
     div.className = "export-item";
     div.dataset.index = i;
+    if (useDistanceRange) {
+      div.dataset.laps = perExportLaps;
+      div.dataset.distKm = perExportDistKm.toFixed(2);
+    }
     div.innerHTML = `
       <div class="export-header">
         <span class="export-title">📄 第${i+1}份</span>
@@ -399,6 +540,11 @@ function rebuildExports() {
             <input type="number" class="exp-psec" value="${ps}" min="0" max="59" style="flex:1" />
           </div>
         </div>
+        ${useDistanceRange ? `
+        <div class="fg" style="grid-column:1/-1">
+          <label>距离 / 圈数</label>
+          <span style="font-size:11px; color:var(--accent);">${perExportDistKm.toFixed(2)} km / ${perExportLaps}圈</span>
+        </div>` : ''}
       </div>
     `;
     $exportList.appendChild(div);
@@ -466,6 +612,7 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   if (basePolyline) { map.removeLayer(basePolyline); basePolyline = null; }
   if (samplePolyline) { map.removeLayer(samplePolyline); samplePolyline = null; }
   if (previewCursor) { map.removeLayer(previewCursor); previewCursor = null; }
+  if (startPointMarker) { map.removeLayer(startPointMarker); startPointMarker = null; }
   $charts.style.display = "none"; refreshUI(); updateMsg("已清除", "");
 });
 
@@ -493,7 +640,7 @@ document.getElementById("previewBtn").addEventListener("click", async () => {
   const pace = pm*60 + ps;
   const hrR = parseInt(document.getElementById("hrRest")?.value,10)||60;
   const hrM = parseInt(document.getElementById("hrMax")?.value,10)||180;
-  const laps = Math.max(1, parseInt(document.getElementById("lapCount")?.value,10)||1);
+  const previewLaps = getEffectiveLaps();
   const wkg = parseInt(document.getElementById("weight")?.value,10)||65;
   const bAlt = parseInt(document.getElementById("baseAltitude")?.value,10)||50;
   const vAlt = parseInt(document.getElementById("altitudeVariation")?.value,10)||15;
@@ -502,7 +649,7 @@ document.getElementById("previewBtn").addEventListener("click", async () => {
   try {
     const res = await fetch("/api/preview", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ startTime: start.toISOString(), points: gcjArrToWgs(pts), paceSecondsPerKm: pace, hrRest: hrR, hrMax: hrM, lapCount: 1, weightKg: wkg, baseAltitude: bAlt, altitudeVariation: vAlt }),
+      body:JSON.stringify({ startTime: start.toISOString(), points: gcjArrToWgs(pts), paceSecondsPerKm: pace, hrRest: hrR, hrMax: hrM, lapCount: 1, actualLaps: previewLaps, weightKg: wkg, baseAltitude: bAlt, altitudeVariation: vAlt }),
     });
     if (!res.ok) { const e = await res.json().catch(()=>({})); updateMsg(e.error||"预览失败","error"); return; }
     const data = await res.json();
@@ -550,7 +697,6 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
 
   const hrR = parseInt(document.getElementById("hrRest")?.value,10)||60;
   const hrM = parseInt(document.getElementById("hrMax")?.value,10)||180;
-  const laps = Math.max(1, parseInt(document.getElementById("lapCount")?.value,10)||1);
   const wkg = parseInt(document.getElementById("weight")?.value,10)||65;
   const bAlt = parseInt(document.getElementById("baseAltitude")?.value,10)||50;
   const vAlt = parseInt(document.getElementById("altitudeVariation")?.value,10)||15;
@@ -576,13 +722,14 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
       const sigma = parseFloat(item.querySelector(".exp-sigma")?.value)||2;
       const seedTxt = item.querySelector(".export-seed")?.textContent || "";
       const seed = parseInt(seedTxt.replace(/[^0-9]/g,""),10) || (Math.floor(Math.random()*999999)+i*10000);
-      const batchPts = generateVariant(seed, sigma);
+      const perExportLaps = useDistanceRange ? (parseInt(item.dataset.laps, 10) || 1) : undefined;
+      const batchPts = generateVariant(seed, sigma, perExportLaps);
       const res = await fetch("/api/generate-fit", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           startTime: start.toISOString(), points: gcjArrToWgs(batchPts),
           paceSecondsPerKm: pace, hrRest: hrR, hrMax: hrM,
-          lapCount: 1, weightKg: wkg,
+          lapCount: 1, actualLaps: perExportLaps || getEffectiveLaps(), weightKg: wkg,
           baseAltitude: bAlt, altitudeVariation: vAlt,
           variantIndex: i+1,
         }),

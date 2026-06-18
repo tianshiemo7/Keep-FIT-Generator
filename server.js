@@ -261,7 +261,7 @@ function encodeFit(startDate, allPoints, distances, totalDist, samples, totalDur
     // Grade
     avgGrade: 0,
     // Laps
-    numLaps: config.lapCount,
+    numLaps: config.actualLaps || config.lapCount,
   });
 
   encoder.onMesg(Profile.MesgNum.ACTIVITY, {
@@ -272,8 +272,9 @@ function encodeFit(startDate, allPoints, distances, totalDist, samples, totalDur
   });
 
   // LAP messages
-  const pointsPerLap = Math.floor(samples.length / config.lapCount);
-  for (let lap = 0; lap < config.lapCount; lap++) {
+  const effectiveLaps = config.actualLaps || config.lapCount;
+  const pointsPerLap = Math.floor(samples.length / effectiveLaps);
+  for (let lap = 0; lap < effectiveLaps; lap++) {
     const start = lap * pointsPerLap;
     const end = Math.min((lap + 1) * pointsPerLap, samples.length - 1);
     const lapDuration = samples[end].timeSec - samples[start].timeSec;
@@ -287,13 +288,13 @@ function encodeFit(startDate, allPoints, distances, totalDist, samples, totalDur
       totalElapsedTime: lapDuration,
       totalTimerTime: lapDuration,
       totalDistance: lapDistance,
-      totalCalories: Math.round(calories / config.lapCount),
+      totalCalories: Math.round(calories / effectiveLaps),
       sport: "running",
       avgSpeed: lapDistance / lapDuration,
       avgHeartRate: avgHr,
       maxHeartRate: maxHr,
-      totalAscent: Math.round(totalAscent / config.lapCount),
-      totalDescent: Math.round(totalDescent / config.lapCount),
+      totalAscent: Math.round(totalAscent / effectiveLaps),
+      totalDescent: Math.round(totalDescent / effectiveLaps),
       avgRunningCadence,
       messageIndex: lap,
     });
@@ -422,7 +423,7 @@ app.get("/api/locate", async (req, res) => {
 app.post("/api/preview", (req, res) => {
   try {
     const body = req.body || {};
-    const { startTime, points, paceSecondsPerKm, hrRest, hrMax, lapCount, weightKg, baseAltitude, altitudeVariation } = body;
+    const { startTime, points, paceSecondsPerKm, hrRest, hrMax, lapCount, actualLaps, weightKg, baseAltitude, altitudeVariation } = body;
 
     if (!startTime || !points || !Array.isArray(points) || points.length < 2) {
       return res.status(400).json({ error: "需要 startTime 和至少两个轨迹点" });
@@ -438,6 +439,7 @@ app.post("/api/preview", (req, res) => {
       hrRest: Number.isFinite(Number(hrRest)) ? Number(hrRest) : 60,
       hrMax: Number.isFinite(Number(hrMax)) ? Number(hrMax) : 180,
       lapCount: Number.isFinite(Number(lapCount)) && Number(lapCount) > 0 ? Math.floor(Number(lapCount)) : 1,
+      actualLaps: Number.isFinite(Number(actualLaps)) && Number(actualLaps) > 0 ? Math.floor(Number(actualLaps)) : (Number.isFinite(Number(lapCount)) && Number(lapCount) > 0 ? Math.floor(Number(lapCount)) : 1),
       weightKg: Number.isFinite(Number(weightKg)) && weightKg > 30 && weightKg < 150 ? Number(weightKg) : 65,
       baseAltitude: Number.isFinite(Number(baseAltitude)) ? Number(baseAltitude) : 50,
       altitudeVariation: Number.isFinite(Number(altitudeVariation)) ? Number(altitudeVariation) : 15,
@@ -488,7 +490,7 @@ app.post("/api/generate-fit", (req, res) => {
     const body = req.body || {};
     const {
       startTime, points, paceSecondsPerKm, hrRest, hrMax,
-      lapCount, variantIndex, weightKg,
+      lapCount, actualLaps, variantIndex, weightKg,
       baseAltitude, altitudeVariation,
     } = body;
 
@@ -506,6 +508,7 @@ app.post("/api/generate-fit", (req, res) => {
       hrRest: Number.isFinite(Number(hrRest)) ? Number(hrRest) : 60,
       hrMax: Number.isFinite(Number(hrMax)) ? Number(hrMax) : 180,
       lapCount: Number.isFinite(Number(lapCount)) && Number(lapCount) > 0 ? Math.floor(Number(lapCount)) : 1,
+      actualLaps: Number.isFinite(Number(actualLaps)) && Number(actualLaps) > 0 ? Math.floor(Number(actualLaps)) : (Number.isFinite(Number(lapCount)) && Number(lapCount) > 0 ? Math.floor(Number(lapCount)) : 1),
       weightKg: Number.isFinite(Number(weightKg)) && weightKg > 30 && weightKg < 150 ? Number(weightKg) : 65,
       baseAltitude: Number.isFinite(Number(baseAltitude)) ? Number(baseAltitude) : 50,
       altitudeVariation: Number.isFinite(Number(altitudeVariation)) ? Number(altitudeVariation) : 15,
