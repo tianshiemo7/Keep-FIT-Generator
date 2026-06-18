@@ -220,6 +220,30 @@
     </div>
   </div>
 
+  <!-- ====== Star Request Modal ====== -->
+  <div class="modal-overlay" id="starModal">
+    <div class="modal-card">
+      <button class="modal-close" id="starModalClose">&times;</button>
+      <div class="modal-icon">⭐</div>
+      <h2 class="modal-title">喜欢这个工具吗？</h2>
+      <p class="modal-desc">如果 Keep-FIT-Generator 对你有帮助，<br>请给个 Star 支持一下！</p>
+      <div class="modal-btns">
+        <a href="https://github.com/tianshiemo7/Keep-FIT-Generator" target="_blank" rel="noopener" class="modal-btn modal-btn-github">
+          <svg height="20" viewBox="0 0 16 16" width="20" style="vertical-align:middle;margin-right:6px;"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub Star
+        </a>
+        <a href="https://gitee.com/tesm1234/Keep-FIT-Generator" target="_blank" rel="noopener" class="modal-btn modal-btn-gitee">
+          <svg height="20" viewBox="0 0 24 24" width="20" style="vertical-align:middle;margin-right:6px;"><path fill="currentColor" d="M11.984 0C5.365 0 0 5.365 0 11.984c0 5.303 3.446 9.792 8.216 11.373.6.113.82-.258.82-.578 0-.286-.01-1.04-.015-2.04-3.34.724-4.046-1.61-4.046-1.61-.546-1.382-1.333-1.75-1.333-1.75-1.09-.745.083-.73.083-.73 1.205.085 1.838 1.236 1.838 1.236 1.07 1.834 2.807 1.304 3.492.998.108-.775.42-1.304.763-1.604-2.665-.3-5.467-1.333-5.467-5.933 0-1.31.468-2.382 1.236-3.222-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.3 1.23a11.52 11.52 0 013.003-.404c1.02.005 2.045.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.652.242 2.873.118 3.176.77.84 1.235 1.912 1.235 3.222 0 4.61-2.805 5.63-5.475 5.92.43.37.813 1.103.813 2.223 0 1.604-.014 2.898-.014 3.293 0 .323.216.697.825.58C20.56 21.767 24 17.282 24 11.984 24 5.365 18.635 0 11.984 0z"/></svg>
+          Gitee Star
+        </a>
+      </div>
+      <label class="modal-dismiss">
+        <input type="checkbox" id="starDismiss" />
+        <span>不再提示</span>
+      </label>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>

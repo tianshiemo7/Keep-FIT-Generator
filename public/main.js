@@ -747,6 +747,7 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       updateMsg("✅ 已导出 run.fit","success");
+      showStarModal();
     } else {
       // Multiple files: pack into zip
       updateMsg("📦 正在打包 ZIP...","info");
@@ -764,6 +765,7 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       updateMsg(`✅ 已导出 ZIP (${blobs.length} 个 FIT 文件)`,"success");
+      showStarModal();
     }
   } catch(e) { console.error(e); updateMsg("网络错误","error"); }
 });
@@ -780,6 +782,31 @@ $exportList.addEventListener("change", function(e) {
     const nd = new Date(refDate.getTime() + (j - idx)*86400000);
     di.value = nd.toISOString().slice(0, 10);
   });
+});
+
+// ====== Star Request Modal ======
+const STAR_DISMISS_KEY = "keepfit_star_dismissed";
+
+function showStarModal() {
+  if (localStorage.getItem(STAR_DISMISS_KEY)) return;
+  const modal = document.getElementById("starModal");
+  if (modal) modal.classList.add("show");
+}
+
+function hideStarModal(remember) {
+  const modal = document.getElementById("starModal");
+  if (modal) modal.classList.remove("show");
+  if (remember) localStorage.setItem(STAR_DISMISS_KEY, "1");
+}
+
+document.getElementById("starModalClose")?.addEventListener("click", () => {
+  hideStarModal(document.getElementById("starDismiss")?.checked);
+});
+
+document.getElementById("starModal")?.addEventListener("click", (e) => {
+  if (e.target.id === "starModal") {
+    hideStarModal(document.getElementById("starDismiss")?.checked);
+  }
 });
 
 // ====== Init ======
