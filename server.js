@@ -360,17 +360,25 @@ function isPrivateIP(ip) {
 
 app.get("/api/locate", async (req, res) => {
   try {
+    // 提取客户端真实 IP（跳过代理/内网中间层）
     const forwarded = req.headers["x-forwarded-for"];
-    const clientIp = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : "") || req.ip || req.socket.remoteAddress || "";
+    let clientIp = "";
+    if (typeof forwarded === "string") {
+      // x-forwarded-for: "client, proxy1, proxy2" → 取第一个非内网 IP
+      clientIp = forwarded.split(",").map(s => s.trim()).find(ip => !isPrivateIP(ip)) || forwarded.split(",")[0].trim();
+    }
+    if (!clientIp) clientIp = req.ip || req.socket.remoteAddress || "";
 
+    // 本地开发 → 返回上海近似位置（前端会标记为 fallback）
     if (isPrivateIP(clientIp)) {
       return res.json({
         lat: 31.2304, lng: 121.4737,
-        city: "上海（默认）", country: "中国",
+        city: "上海（近似）", country: "中国",
         ip: clientIp, source: "private", fallback: true,
       });
     }
 
+    // 调用外部 IP 定位服务
     const urls = [
       `http://ip-api.com/json/${clientIp}?lang=zh-CN&fields=status,message,lat,lon,city,country,query`,
       `https://ipapi.co/${clientIp}/json/`,
@@ -391,12 +399,9 @@ app.get("/api/locate", async (req, res) => {
       } catch (_) { /* 尝试下一个 */ }
     }
 
+    // API 全部失败 → 返回错误，前端不会误判为成功
     if (!data) {
-      return res.json({
-        lat: 31.2304, lng: 121.4737,
-        city: "上海（默认）", country: "中国",
-        ip: clientIp, source: "fallback", fallback: true,
-      });
+      return res.status(502).json({ error: "IP定位服务暂不可用，请手动拖动地图" });
     }
 
     return res.json({

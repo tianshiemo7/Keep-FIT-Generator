@@ -120,8 +120,13 @@ document.getElementById("locateBtn").addEventListener("click", async () => {
     if (resp.ok) {
       const data = await resp.json();
       showLocatedPosition(data.lat, data.lng, data.city || "", false);
-      updateMsg(`📍 IP定位: ${data.city || "未知"} (来自服务端)`, "info");
-      located = true;
+      if (data.fallback) {
+        updateMsg(`📍 IP定位: ${data.city || "近似"} (仅供参考)`, "info");
+        // fallback 不算定位成功，留给 GPS 覆盖
+      } else {
+        updateMsg(`📍 IP定位: ${data.city || "未知"} (来自服务端)`, "info");
+        located = true;
+      }
     }
   } catch (e) {
     console.error("Server locate error:", e);
