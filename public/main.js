@@ -91,11 +91,30 @@ const $consBtn = document.getElementById("consecutiveBtn");
 
 // ====== GPS Locate ======
 let locationMarker = null;
+
+function showLocatedPosition(wgsLat, wgsLng, detail = "") {
+  const gcj = wgsToGcj(wgsLng, wgsLat);
+
+  if (locationMarker) map.removeLayer(locationMarker);
+  locationMarker = L.circleMarker([gcj.lat, gcj.lng], {
+    radius: 8, color: "#58a6ff", fillColor: "#58a6ff",
+    fillOpacity: 0.4, weight: 2,
+  }).bindPopup(`<b>当前位置</b>${detail ? `<br>${detail}` : ""}`).addTo(map);
+  locationMarker.openPopup();
+  map.setView([gcj.lat, gcj.lng], 16);
+}
+
 document.getElementById("locateBtn").addEventListener("click", () => {
   const btn = document.getElementById("locateBtn");
   btn.textContent = "⏳..."; btn.disabled = true;
+  const secureContext = window.isSecureContext || location.hostname === "localhost" || location.hostname === "127.0.0.1";
   if (!navigator.geolocation) {
-    updateMsg("浏览器不支持定位，请使用 HTTPS 或 localhost", "error");
+    updateMsg("浏览器不支持 GPS 定位，请手动拖动地图到目标位置", "error");
+    btn.textContent = "📍 定位"; btn.disabled = false;
+    return;
+  }
+  if (!secureContext) {
+    updateMsg("当前页面不是 HTTPS，浏览器可能禁止 GPS 定位，请手动拖动地图到目标位置", "error");
     btn.textContent = "📍 定位"; btn.disabled = false;
     return;
   }
@@ -103,15 +122,9 @@ document.getElementById("locateBtn").addEventListener("click", () => {
   const opts = { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 };
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      const { latitude: lat, longitude: lng } = pos.coords;
-      if (locationMarker) map.removeLayer(locationMarker);
-      locationMarker = L.circleMarker([lat, lng], {
-        radius: 8, color: "#58a6ff", fillColor: "#58a6ff",
-        fillOpacity: 0.4, weight: 2,
-      }).bindPopup(`<b>当前位置</b><br>精度: ±${pos.coords.accuracy.toFixed(0)}m`).addTo(map);
-      locationMarker.openPopup();
-      map.setView([lat, lng], 16);
-      updateMsg(`定位成功 精度±${pos.coords.accuracy.toFixed(0)}m`, "success");
+      const { latitude: wgsLat, longitude: wgsLng } = pos.coords;
+      showLocatedPosition(wgsLat, wgsLng, `精度: ±${pos.coords.accuracy.toFixed(0)}m`);
+      updateMsg(`GPS 定位成功 精度±${pos.coords.accuracy.toFixed(0)}m`, "success");
       btn.textContent = "📍 定位"; btn.disabled = false;
     },
     (err) => {
@@ -121,7 +134,7 @@ document.getElementById("locateBtn").addEventListener("click", () => {
         2: "无法获取位置信息，请检查 GPS/网络",
         3: "定位超时，请重试",
       };
-      updateMsg("定位失败: " + (msgs[err.code] || err.message), "error");
+      updateMsg("GPS 定位失败: " + (msgs[err.code] || err.message) + "，请手动拖动地图到目标位置", "error");
       btn.textContent = "📍 定位"; btn.disabled = false;
     },
     opts
