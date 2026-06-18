@@ -89,56 +89,66 @@ const $exportList = document.getElementById("exportList");
 const $map = document.getElementById("map");
 const $consBtn = document.getElementById("consecutiveBtn");
 
-// ====== GPS Locate ======
+// ====== Locate (IP 定位优先 + GPS 高精度增强) ======
 let locationMarker = null;
 
-function showLocatedPosition(wgsLat, wgsLng, detail = "") {
-  const gcj = wgsToGcj(wgsLng, wgsLat);
+function showLocatedPosition(lat, lng, detail = "", isGps = false) {
+  // GPS 坐标是 WGS84 需转 GCJ02，IP 定位返回的已是 WGS84 同样需要转换
+  const gcj = wgsToGcj(lng, lat);
 
   if (locationMarker) map.removeLayer(locationMarker);
+  const color = isGps ? "#58a6ff" : "#d2991d";
+  const label = isGps
+    ? `<b>GPS精确定位</b>${detail ? "<br>" + detail : ""}`
+    : `<b>IP定位(近似)</b>${detail ? "<br>" + detail : ""}`;
   locationMarker = L.circleMarker([gcj.lat, gcj.lng], {
-    radius: 8, color: "#58a6ff", fillColor: "#58a6ff",
-    fillOpacity: 0.4, weight: 2,
-  }).bindPopup(`<b>当前位置</b>${detail ? `<br>${detail}` : ""}`).addTo(map);
+    radius: 8, color, fillColor: color, fillOpacity: 0.4, weight: 2,
+  }).bindPopup(label).addTo(map);
   locationMarker.openPopup();
-  map.setView([gcj.lat, gcj.lng], 16);
+  map.setView([gcj.lat, gcj.lng], isGps ? 16 : 12);
 }
 
-document.getElementById("locateBtn").addEventListener("click", () => {
+document.getElementById("locateBtn").addEventListener("click", async () => {
   const btn = document.getElementById("locateBtn");
   btn.textContent = "⏳..."; btn.disabled = true;
+
+  let located = false;
+
+  // 1. 服务端 IP 定位（HTTP/HTTPS 均可用，无需权限）
+  try {
+    const resp = await fetch("/api/locate", { signal: AbortSignal.timeout(5000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      showLocatedPosition(data.lat, data.lng, data.city || "", false);
+      updateMsg(`📍 IP定位: ${data.city || "未知"} (来自服务端)`, "info");
+      located = true;
+    }
+  } catch (e) {
+    console.error("Server locate error:", e);
+  }
+
+  // 2. 浏览器 GPS 高精度覆盖（仅 HTTPS/localhost 可用）
   const secureContext = window.isSecureContext || location.hostname === "localhost" || location.hostname === "127.0.0.1";
-  if (!navigator.geolocation) {
-    updateMsg("浏览器不支持 GPS 定位，请手动拖动地图到目标位置", "error");
-    btn.textContent = "📍 定位"; btn.disabled = false;
-    return;
-  }
-  if (!secureContext) {
-    updateMsg("当前页面不是 HTTPS，浏览器可能禁止 GPS 定位，请手动拖动地图到目标位置", "error");
-    btn.textContent = "📍 定位"; btn.disabled = false;
-    return;
-  }
-  // Wrapper to handle both Chrome (max 60s timeout) and Firefox
-  const opts = { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 };
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
+  if (navigator.geolocation && secureContext) {
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true, timeout: 10000, maximumAge: 60000,
+        });
+      });
       const { latitude: wgsLat, longitude: wgsLng } = pos.coords;
-      showLocatedPosition(wgsLat, wgsLng, `精度: ±${pos.coords.accuracy.toFixed(0)}m`);
-      updateMsg(`GPS 定位成功 精度±${pos.coords.accuracy.toFixed(0)}m`, "success");
-      btn.textContent = "📍 定位"; btn.disabled = false;
-    },
-    (err) => {
-      console.error("Geolocation error:", err.code, err.message);
-      const msgs = {
-        1: "权限被拒绝，请在浏览器设置中允许定位",
-        2: "无法获取位置信息，请检查 GPS/网络",
-        3: "定位超时，请重试",
-      };
-      updateMsg("GPS 定位失败: " + (msgs[err.code] || err.message) + "，请手动拖动地图到目标位置", "error");
-      btn.textContent = "📍 定位"; btn.disabled = false;
-    },
-    opts
-  );
+      showLocatedPosition(wgsLat, wgsLng, `精度: ±${pos.coords.accuracy.toFixed(0)}m`, true);
+      updateMsg(`📍 GPS定位成功 精度±${pos.coords.accuracy.toFixed(0)}m`, "success");
+      located = true;
+    } catch (e) {
+      console.error("GPS error:", e.code, e.message);
+    }
+  }
+
+  if (!located) {
+    updateMsg("定位失败: 服务端IP定位和浏览器GPS均不可用", "error");
+  }
+  btn.textContent = "📍 定位"; btn.disabled = false;
 });
 
 // ====== Draw Mode Toggle ======

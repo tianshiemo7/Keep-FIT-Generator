@@ -346,6 +346,72 @@ function encodeFit(startDate, allPoints, distances, totalDist, samples, totalDur
   };
 }
 
+// ==================== IP Geolocation ====================
+
+function isPrivateIP(ip) {
+  if (!ip || ip === "::1" || ip === "127.0.0.1" || ip === "::ffff:127.0.0.1") return true;
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4) return true;
+  if (parts[0] === 10) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  return false;
+}
+
+app.get("/api/locate", async (req, res) => {
+  try {
+    const forwarded = req.headers["x-forwarded-for"];
+    const clientIp = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : "") || req.ip || req.socket.remoteAddress || "";
+
+    if (isPrivateIP(clientIp)) {
+      return res.json({
+        lat: 31.2304, lng: 121.4737,
+        city: "上海（默认）", country: "中国",
+        ip: clientIp, source: "private", fallback: true,
+      });
+    }
+
+    const urls = [
+      `http://ip-api.com/json/${clientIp}?lang=zh-CN&fields=status,message,lat,lon,city,country,query`,
+      `https://ipapi.co/${clientIp}/json/`,
+    ];
+
+    let data = null;
+    for (const url of urls) {
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.status === "fail") continue;
+          if (json.lat != null || json.latitude != null) {
+            data = json;
+            break;
+          }
+        }
+      } catch (_) { /* 尝试下一个 */ }
+    }
+
+    if (!data) {
+      return res.json({
+        lat: 31.2304, lng: 121.4737,
+        city: "上海（默认）", country: "中国",
+        ip: clientIp, source: "fallback", fallback: true,
+      });
+    }
+
+    return res.json({
+      lat: Number(data.lat ?? data.latitude),
+      lng: Number(data.lon ?? data.longitude),
+      city: data.city || "",
+      country: data.country || data.country_name || "",
+      ip: clientIp, source: "ip", fallback: false,
+    });
+  } catch (e) {
+    console.error("IP locate error:", e);
+    return res.status(500).json({ error: "定位失败" });
+  }
+});
+
 // ==================== API Routes ====================
 
 app.post("/api/preview", (req, res) => {
